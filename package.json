@@ -1,0 +1,24 @@
+{
+  "name": "wildaitech",
+  "version": "1.0.0",
+  "description": "AI tools without the corporate BS",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@heroicons/react": "^2.2.0",
+    "framer-motion": "^11.15.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49"
+  }
+}
