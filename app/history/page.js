@@ -26,7 +26,7 @@ export default function HistoryPage() {
     loadHistory()
   }, [])
   
-  const loadHistory() {
+  const loadHistory = () => {
     setChatHistory(storage.load('chat_history') || [])
     setImageHistory(storage.load('image_history') || [])
     setStats(storage.getStats())
