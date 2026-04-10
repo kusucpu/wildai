@@ -24,7 +24,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <title>WildAI - Free AI Tools (No BS)</title>
+        <title>WildAItech - Free AI Tools (No BS)</title>
         <meta name="description" content="Free AI chat, image generation, and creative tools. No paywalls, no corporate vibes." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
