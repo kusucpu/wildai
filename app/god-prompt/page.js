@@ -1,173 +1,138 @@
 'use client'
 import { useState } from 'react'
-import { getAllPrompts, searchPrompts } from '@/lib/prompts'
-import { MagnifyingGlassIcon, ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { chat } from '@/lib/pollinations'
+import { GOD_PROMPTS, META_PROMPT_SYSTEM } from '@/lib/prompts'
+import BYOPModal from '@/components/BYOPModal'
 
 export default function GodPromptPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [copiedId, setCopiedId] = useState(null)
-  const [selectedPrompt, setSelectedPrompt] = useState(null)
-  
-  const prompts = searchQuery
-    ? searchPrompts(searchQuery)
-    : getAllPrompts()
-  
-  const copyPrompt = (template, id) => {
-    navigator.clipboard.writeText(template)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
+  const [tab, setTab] = useState('library')
+  const [search, setSearch] = useState('')
+  const [copied, setCopied] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [showBYOP, setShowBYOP] = useState(false)
+
+  const filtered = GOD_PROMPTS.filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.tags.some(t => t.includes(search.toLowerCase()))
+  )
+
+  const copy = (text, id) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
   }
-  
+
+  const sendMeta = async () => {
+    if (!input.trim() || loading) return
+    const userMsg = { role: 'user', content: input.trim() }
+    const newMsgs = [...messages, userMsg]
+    setMessages(newMsgs)
+    setInput('')
+    setLoading(true)
+    try {
+      const content = await chat(newMsgs, 'openai-fast', META_PROMPT_SYSTEM)
+      setMessages([...newMsgs, { role: 'assistant', content }])
+    } catch (e) {
+      if (e.message === 'quota_exceeded') setShowBYOP(true)
+      else setMessages(prev => [...prev, { role: 'system', content: 'api broke lol: ' + e.message }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="container py-6">
-      
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">
-          ⚡ God Prompt Library
-        </h1>
-        <p className="text-[var(--text-secondary)]">
-          production-ready prompts. copy, paste, dominate.
-        </p>
+    <div className="ct" style={{ paddingTop: '16px', paddingBottom: '32px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <h1>⚡ God Prompt</h1>
+        <p style={{ marginBottom: 0 }}>copy-paste ready prompts + AI prompt builder. no gatekeeping.</p>
       </div>
-      
-      {/* Search */}
-      <div className="max-w-2xl mx-auto mb-8">
-        <div className="relative">
-          <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+
+      <div className="tabs" style={{ marginBottom: '16px' }}>
+        <button className={`tab ${tab === 'library' ? 'active' : ''}`} onClick={() => setTab('library')}>📚 Library</button>
+        <button className={`tab ${tab === 'builder' ? 'active' : ''}`} onClick={() => setTab('builder')}>🤖 AI Builder</button>
+      </div>
+
+      {tab === 'library' && (
+        <>
           <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
             placeholder="search prompts..."
-            className="w-full pl-10"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ marginBottom: '16px' }}
           />
-        </div>
-      </div>
-      
-      {/* Prompts Grid */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {prompts.map((prompt, idx) => (
-          <div key={idx} className="card">
-            
-            {/* Header */}
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-xl font-bold">{prompt.name}</h3>
-              <span className="text-sm text-[var(--text-muted)]">⭐ {prompt.votes}</span>
-            </div>
-            
-            {/* Description */}
-            <p className="text-[var(--text-secondary)] text-sm mb-3">
-              {prompt.description}
-            </p>
-            
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {prompt.tags?.map(tag => (
-                <span
-                  key={tag}
-                  className="px-2 py-1 bg-[var(--accent)]/10 text-[var(--accent)] rounded text-xs font-medium"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            
-            {/* Disclaimer */}
-            {prompt.disclaimer && (
-              <div className="bg-[var(--warning)]/10 border border-[var(--warning)] rounded-lg p-2 mb-4 text-xs">
-                {prompt.disclaimer}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+            {filtered.map(p => (
+              <div key={p.id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '6px' }}>
+                  <h3 style={{ fontSize: '0.95rem' }}>{p.name}</h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--fg3)' }}>⭐{p.votes.toLocaleString()}</span>
+                </div>
+                <p style={{ fontSize: '0.8rem', marginBottom: '8px' }}>{p.desc}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+                  {p.tags.map(t => <span key={t} className="badge badge-ac">{t}</span>)}
+                </div>
+                {p.disclaimer && <p style={{ fontSize: '0.7rem', color: 'var(--warn)', marginBottom: '8px' }}>{p.disclaimer}</p>}
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button className="btn btn-p btn-sm" style={{ flex: 1 }} onClick={() => copy(p.template, p.id)}>
+                    {copied === p.id ? '✓ copied!' : '📋 copy'}
+                  </button>
+                  <button className="btn btn-s btn-sm" onClick={() => setPreview(p)}>preview</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {filtered.length === 0 && <p style={{ textAlign: 'center', color: 'var(--fg3)' }}>no prompts found for "{search}" lol</p>}
+        </>
+      )}
+
+      {tab === 'builder' && (
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '12px' }}>
+            {messages.length === 0 && (
+              <div className="card" style={{ fontSize: '0.8rem' }}>
+                <p style={{ fontWeight: 600, marginBottom: '4px' }}>🤖 Prompt Architecture Engine v2.1</p>
+                <p style={{ marginBottom: 0, color: 'var(--fg3)' }}>describe your domain/task and I'll generate a production-ready prompt blueprint. one sentence is enough.</p>
               </div>
             )}
-            
-            {/* Actions */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => copyPrompt(prompt.template, idx)}
-                className="flex-1 btn btn-primary text-sm flex items-center justify-center gap-2"
-              >
-                {copiedId === idx ? (
-                  <>
-                    <CheckIcon className="w-4 h-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <ClipboardDocumentIcon className="w-4 h-4" />
-                    Copy Prompt
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={() => setSelectedPrompt(prompt)}
-                className="btn btn-secondary text-sm"
-              >
-                Preview
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {prompts.length === 0 && (
-        <div className="text-center py-12 text-[var(--text-muted)]">
-          <p>no prompts found for "{searchQuery}"</p>
-          <button
-            onClick={() => setSearchQuery('')}
-            className="text-[var(--accent)] hover:underline mt-2"
-          >
-            clear search
-          </button>
-        </div>
-      )}
-      
-      {/* Preview Modal */}
-      {selectedPrompt && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedPrompt(null)}
-        >
-          <div 
-            className="bg-[var(--bg-primary)] rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[var(--border)]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-2xl font-bold">{selectedPrompt.name}</h2>
-                <p className="text-[var(--text-secondary)]">{selectedPrompt.description}</p>
+            {messages.map((m, i) => (
+              <div key={i} className={`msg ${m.role === 'user' ? 'user' : m.role === 'system' ? 'sys' : 'ai'}`}>
+                <div className="msg-bubble">
+                  <div className="msg-label">{m.role === 'user' ? 'you' : m.role === 'system' ? 'error' : 'engine'}</div>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.8rem' }}>{m.content}</pre>
+                </div>
               </div>
-              <button onClick={() => setSelectedPrompt(null)}>
-                <span className="text-2xl">×</span>
-              </button>
+            ))}
+            {loading && <div className="msg ai"><div className="msg-bubble"><div className="dots"><div className="dot" /><div className="dot" /><div className="dot" /></div></div></div>}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--bd)', paddingTop: '8px' }}>
+            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMeta() } }} placeholder="describe your task..." rows={2} style={{ flex: 1, resize: 'none' }} />
+            <button className="btn btn-p" onClick={sendMeta} disabled={loading || !input.trim()}>send</button>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <div className="modal-overlay" onClick={() => setPreview(null)}>
+          <div className="modal-box" style={{ padding: '20px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <h3>{preview.name}</h3>
+              <button className="icon-btn" onClick={() => setPreview(null)}>✕</button>
             </div>
-            
-            <div className="bg-[var(--bg-secondary)] rounded-lg p-4 mb-4 overflow-x-auto">
-              <pre className="text-sm whitespace-pre-wrap font-mono">
-                {selectedPrompt.template}
-              </pre>
+            <div className="card" style={{ maxHeight: '50vh', overflowY: 'auto', marginBottom: '12px' }}>
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', fontFamily: 'inherit' }}>{preview.template}</pre>
             </div>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  copyPrompt(selectedPrompt.template, 'preview')
-                  setSelectedPrompt(null)
-                }}
-                className="btn btn-primary flex-1"
-              >
-                Copy & Close
-              </button>
-              <button
-                onClick={() => setSelectedPrompt(null)}
-                className="btn btn-secondary"
-              >
-                Close
-              </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn btn-p" style={{ flex: 1 }} onClick={() => { copy(preview.template, 'preview'); setPreview(null) }}>copy & close</button>
+              <button className="btn btn-s" onClick={() => setPreview(null)}>close</button>
             </div>
           </div>
         </div>
       )}
+
+      {showBYOP && <BYOPModal onClose={() => setShowBYOP(false)} />}
     </div>
   )
 }
