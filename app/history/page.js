@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { storage } from '@/lib/storage'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { 
@@ -11,7 +11,8 @@ import {
   ClipboardDocumentIcon
 } from '@heroicons/react/24/outline'
 
-export default function HistoryPage() {
+// Separate component for search params logic
+function HistoryContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialTab = searchParams.get('tab') || 'chat'
@@ -58,7 +59,6 @@ export default function HistoryPage() {
   }
   
   const openChat = (chat) => {
-    // Save current chat to localStorage for loading in chat page
     localStorage.setItem('load_chat', JSON.stringify(chat))
     router.push('/chat')
   }
@@ -105,7 +105,6 @@ export default function HistoryPage() {
       >
         <div className="max-w-6xl w-full" onClick={e => e.stopPropagation()}>
           
-          {/* Image */}
           <div className="relative">
             <img
               src={image.url}
@@ -113,7 +112,6 @@ export default function HistoryPage() {
               className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
             />
             
-            {/* Navigation Arrows */}
             {hasPrev && (
               <button
                 onClick={() => navigate(-1)}
@@ -132,7 +130,6 @@ export default function HistoryPage() {
               </button>
             )}
             
-            {/* Close Button */}
             <button
               onClick={onClose}
               className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm"
@@ -141,7 +138,6 @@ export default function HistoryPage() {
             </button>
           </div>
           
-          {/* Info */}
           <div className="mt-4 bg-white/5 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-start justify-between gap-4 mb-3">
               <div className="flex-1 max-h-20 overflow-y-auto">
@@ -189,7 +185,6 @@ export default function HistoryPage() {
   return (
     <div className="container py-6">
       
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">📜 History</h1>
         <p className="text-sm text-[var(--danger)] mb-2">
@@ -199,7 +194,6 @@ export default function HistoryPage() {
         </p>
       </div>
       
-      {/* Tabs */}
       <div className="flex gap-2 mb-6">
         <button
           onClick={() => setTab('chat')}
@@ -223,7 +217,6 @@ export default function HistoryPage() {
         </button>
       </div>
       
-      {/* Chat History */}
       {tab === 'chat' && (
         <div className="space-y-3">
           {chatHistory.length === 0 ? (
@@ -267,7 +260,6 @@ export default function HistoryPage() {
         </div>
       )}
       
-      {/* Image History */}
       {tab === 'image' && (
         <div>
           {imageHistory.length === 0 ? (
@@ -312,8 +304,22 @@ export default function HistoryPage() {
         </div>
       )}
       
-      {/* Image Modal */}
       <ImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
+  )
+}
+
+// Main export with Suspense wrapper
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="container py-6">
+        <div className="text-center py-12">
+          <p className="text-[var(--text-muted)]">Loading history...</p>
+        </div>
+      </div>
+    }>
+      <HistoryContent />
+    </Suspense>
   )
 }
