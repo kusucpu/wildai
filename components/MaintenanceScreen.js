@@ -1,32 +1,21 @@
 'use client'
-import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
+const msgs = [
+  "still cooking this one, give me a sec lmao",
+  "coming soon™ (actually fr this time)",
+  "construction zone rn, helmet required",
+  "bro I only have one pair of hands 😭",
+  "patience is a virtue or whatever"
+]
 
-export default function MaintenanceScreen({ feature = 'This feature' }) {
-  const messages = [
-    "still building this one lol",
-    "coming soon™ (actually tho)",
-    "work in progress, don't judge",
-    "patience, young padawan",
-    "rome wasn't built in a day, neither is this"
-  ]
-  
-  const randomMessage = messages[Math.floor(Math.random() * messages.length)]
-  
+export default function MaintenanceScreen({ feature = 'This' }) {
+  const msg = msgs[Math.floor(Math.random() * msgs.length)]
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center">
-      <WrenchScrewdriverIcon className="w-24 h-24 text-[var(--text-muted)] mb-4" />
-      <h1 className="text-4xl font-bold mb-2">{feature}</h1>
-      <p className="text-xl text-[var(--text-secondary)] mb-4">
-        {randomMessage}
-      </p>
-      <p className="text-[var(--text-muted)] max-w-md">
-        working on it between coffee breaks ☕ 
-        <br />
-        check back later or follow updates on twitter (if I remember to post)
-      </p>
-      <a href="/" className="btn btn-primary mt-8">
-        ← Back to Home
-      </a>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', padding: '24px', gap: '12px' }}>
+      <div style={{ fontSize: '3rem' }}>🚧</div>
+      <h1>{feature}</h1>
+      <p style={{ maxWidth: '280px' }}>{msg}</p>
+      <p style={{ color: 'var(--fg3)', fontSize: '0.8rem', marginBottom: 0 }}>working on it between coffee breaks ☕</p>
+      <a href="/" className="btn btn-s" style={{ marginTop: '8px' }}>← back to home</a>
     </div>
   )
 }
