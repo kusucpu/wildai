@@ -1,30 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  
-  // Image optimization
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'image.pollinations.ai',
-      },
-      {
-        protocol: 'https',
-        hostname: 'gen.pollinations.ai',
-      }
+      { protocol: 'https', hostname: 'gen.pollinations.ai' },
+      { protocol: 'https', hostname: 'image.pollinations.ai' },
     ],
     unoptimized: true
   },
-  
-  // ESLint
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  
-  // TypeScript (if needed)
-  typescript: {
-    ignoreBuildErrors: true
-  }
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true }
 }
-
 module.exports = nextConfig
