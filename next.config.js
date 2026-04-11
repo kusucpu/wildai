@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Output mode
-  output: 'standalone',
   
   // Image optimization
   images: {
