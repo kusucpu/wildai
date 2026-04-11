@@ -1,138 +1,72 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  ChatBubbleLeftIcon,
-  PhotoIcon,
-  SparklesIcon,
-  ClockIcon,
-  NewspaperIcon,
-  VideoCameraIcon,
-  PuzzlePieceIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon
-} from '@heroicons/react/24/outline'
 
-const NAV_ITEMS = [
-  { id: 'chat', label: 'Chat', icon: ChatBubbleLeftIcon, href: '/chat' },
-  { id: 'image', label: 'Image', icon: PhotoIcon, href: '/image' },
-  { id: 'god', label: 'God', icon: SparklesIcon, href: '/god-prompt' },
-  { id: 'history', label: 'History', icon: ClockIcon, href: '/history' },
-  { id: 'article', label: 'Article', icon: NewspaperIcon, href: '/articles', badge: 'soon' },
-  { id: 'video', label: 'Video', icon: VideoCameraIcon, href: '/videos', badge: 'soon' },
-  { id: 'game', label: 'Game', icon: PuzzlePieceIcon, href: '/game', badge: 'soon' }
+const ITEMS = [
+  { href: '/articles', label: 'Articles', badge: 'soon', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l6 6v8a2 2 0 01-2 2z" /><path strokeLinecap="round" d="M17 20V14H7v6M7 4v5h8" /></svg> },
+  { href: '/videos', label: 'Videos', badge: 'soon', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg> },
+  { href: '/chat', label: 'Chat', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> },
+  { href: '/image', label: 'Image', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={1.75} /><circle cx="8.5" cy="8.5" r="1.5" strokeWidth={1.75} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 15l-5-5L5 21" /></svg> },
+  { href: '/game', label: 'Game', badge: 'soon', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg> },
+  { href: '/god-prompt', label: 'God⚡', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> },
+  { href: '/history', label: 'History', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={1.75} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 6v6l4 2" /></svg> },
 ]
 
-export default function BottomNav({ isVisible }) {
+export default function BottomNav({ open }) {
   const pathname = usePathname()
   const scrollRef = useRef(null)
-  const [showLeftArrow, setShowLeftArrow] = useState(false)
-  const [showRightArrow, setShowRightArrow] = useState(true)
-  
+  const [showL, setShowL] = useState(false)
+  const [showR, setShowR] = useState(true)
+
   const checkScroll = () => {
     const el = scrollRef.current
     if (!el) return
-    
-    const isStart = el.scrollLeft <= 5
-    const isEnd = el.scrollLeft >= (el.scrollWidth - el.clientWidth - 5)
-    
-    setShowLeftArrow(!isStart)
-    setShowRightArrow(!isEnd)
+    setShowL(el.scrollLeft > 5)
+    setShowR(el.scrollLeft < el.scrollWidth - el.clientWidth - 5)
   }
-  
+
   useEffect(() => {
     checkScroll()
     const el = scrollRef.current
-    if (el) {
-      el.addEventListener('scroll', checkScroll)
-      window.addEventListener('resize', checkScroll)
-      return () => {
-        el.removeEventListener('scroll', checkScroll)
-        window.removeEventListener('resize', checkScroll)
-      }
-    }
+    el?.addEventListener('scroll', checkScroll, { passive: true })
+    return () => el?.removeEventListener('scroll', checkScroll)
   }, [])
-  
+
   useEffect(() => {
-    const activeItem = document.querySelector('.nav-item.active')
-    if (activeItem && scrollRef.current) {
-      setTimeout(() => {
-        activeItem.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center'
-        })
-      }, 100)
+    const active = document.querySelector('.nav-item.active')
+    if (active && scrollRef.current) {
+      setTimeout(() => active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 200)
     }
-  }, [pathname])
-  
-  const scrollLeft = () => {
-    scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })
-  }
-  
-  const scrollRight = () => {
-    scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })
-  }
-  
-  const handleNavClick = () => {
-    if (navigator.vibrate) {
-      navigator.vibrate(10)
-    }
-  }
-  
-  if (!isVisible) return null
-  
+  }, [pathname, open])
+
   return (
-    <nav className="bottom-nav">
-      {showLeftArrow && (
-        <button 
-          className="nav-arrow nav-arrow-left"
-          onClick={scrollLeft}
-          aria-label="Scroll left"
-        >
-          <ChevronLeftIcon className="w-6 h-6" />
+    <div className={`bottom-nav ${open ? 'open' : ''}`}>
+      {showL && (
+        <button className="nav-arrow" onClick={() => scrollRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 18l-6-6 6-6" /></svg>
         </button>
       )}
-      
-      <div 
-        ref={scrollRef}
-        className="nav-scroll-container"
-      >
+      <div ref={scrollRef} className="nav-scroll">
         <div className="nav-items">
-          {NAV_ITEMS.map(item => {
-            const Icon = item.icon
-            const isActive = pathname.startsWith(item.href)
-            
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-                onClick={handleNavClick}
-              >
-                <div className="nav-icon-wrapper">
-                  <Icon className="nav-icon" />
-                  {item.badge && (
-                    <span className="nav-badge">{item.badge}</span>
-                  )}
-                </div>
-                <span className="nav-label">{item.label}</span>
-              </Link>
-            )
-          })}
+          {ITEMS.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item ${pathname.startsWith(item.href) ? 'active' : ''}`}
+            >
+              {item.badge && <span className="nav-badge">{item.badge}</span>}
+              {item.icon}
+              <span className="nav-label">{item.label}</span>
+            </Link>
+          ))}
         </div>
       </div>
-      
-      {showRightArrow && (
-        <button 
-          className="nav-arrow nav-arrow-right"
-          onClick={scrollRight}
-          aria-label="Scroll right"
-        >
-          <ChevronRightIcon className="w-6 h-6" />
+      {showR && (
+        <button className="nav-arrow" onClick={() => scrollRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 18l6-6-6-6" /></svg>
         </button>
       )}
-    </nav>
+    </div>
   )
 }
