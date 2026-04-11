@@ -1,100 +1,53 @@
 'use client'
 import { useState } from 'react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { setByopKey } from '@/lib/pollinations'
 
-export default function BYOPModal({ isOpen, onClose, onSave }) {
+export default function BYOPModal({ onClose }) {
   const [key, setKey] = useState('')
-  
-  if (!isOpen) return null
-  
-  const handleSave = () => {
-    if (key.trim()) {
-      onSave(key)
-      setKey('')
-      onClose()
-    }
+
+  const save = () => {
+    if (!key.trim()) return
+    setByopKey(key.trim())
+    onClose()
   }
-  
+
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-[var(--bg-primary)] rounded-2xl p-6 max-w-md w-full border border-[var(--border)] shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-2xl font-bold">🌸 upgrade to BYOP</h2>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--bg-secondary)] rounded">
-            <XMarkIcon className="w-6 h-6" />
-          </button>
-        </div>
-        
-        {/* Content */}
-        <div className="space-y-4">
-          <p className="text-[var(--text-secondary)]">
-            yo bestie, you've been crushing it with the free tier 🫡
-          </p>
-          
-          <p className="text-[var(--text-secondary)]">
-            but rn servers are packed. wanna skip the line + unlock premium models?
-          </p>
-          
-          <div className="bg-[var(--bg-secondary)] rounded-lg p-4">
-            <h3 className="font-semibold mb-2">what $5 gets you:</h3>
-            <ul className="space-y-1 text-sm text-[var(--text-secondary)]">
-              <li>💬 5,000,000 chat messages (mistral)</li>
-              <li>🎨 5,000 images (flux model)</li>
-              <li>🚀 instant generation (no waiting)</li>
-              <li>🔓 15+ premium models</li>
-            </ul>
-            <p className="text-xs text-[var(--text-muted)] mt-2">
-              no subscription. pay for what you use.
-            </p>
-          </div>
-          
-          {/* Input */}
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Pollen API Key
-            </label>
-            <input
-              type="password"
-              value={key}
-              onChange={e => setKey(e.target.value)}
-              placeholder="paste your key here..."
-              className="w-full"
-            />
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              don't have one?{' '}
-              <a 
-                href="https://enter.pollinations.ai" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-[var(--accent)] hover:underline"
-              >
-                get it free here →
-              </a>
-            </p>
+            <h3>🔑 add your pollen key</h3>
+            <p style={{ fontSize: '0.8rem', marginTop: '4px', marginBottom: 0 }}>quota ran out bestie 😬 time to BYOP</p>
           </div>
-          
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            <button 
-              onClick={handleSave}
-              className="btn btn-primary flex-1"
-            >
-              Save & Unlock
-            </button>
-            <button 
-              onClick={onClose}
-              className="btn btn-secondary flex-1"
-            >
-              nah, I'll wait
-            </button>
+          <button className="icon-btn" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="card" style={{ marginBottom: '12px', fontSize: '0.8rem' }}>
+          <p style={{ marginBottom: '6px', fontWeight: 600 }}>what you get:</p>
+          <div style={{ color: 'var(--fg2)', lineHeight: 1.8 }}>
+            💬 unlimited chat (basically)<br />
+            🚀 skip the rate limit queue<br />
+            🔓 all free models unlocked
           </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--fg3)', marginTop: '8px', marginBottom: 0 }}>
+            no subscription. pay per use. get key at{' '}
+            <a href="https://enter.pollinations.ai" target="_blank" rel="noopener">enter.pollinations.ai</a>
+          </p>
+        </div>
+
+        <input
+          type="password"
+          placeholder="paste your pk_ or sk_ key here..."
+          value={key}
+          onChange={e => setKey(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && save()}
+          autoFocus
+          style={{ marginBottom: '10px' }}
+        />
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-p" style={{ flex: 1 }} onClick={save}>save & unlock</button>
+          <button className="btn btn-s" onClick={onClose}>nah I'll wait</button>
         </div>
       </div>
     </div>
