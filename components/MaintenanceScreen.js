@@ -1,3 +1,4 @@
+'use client'
 import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
 
 export default function MaintenanceScreen({ feature = 'This feature' }) {
