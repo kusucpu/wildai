@@ -1,357 +1,208 @@
 'use client'
-import { useState } from 'react'
-import { pollinations } from '@/lib/pollinations'
+import { useState, useEffect } from 'react'
+import { buildImageUrl, FREE_IMAGE_MODELS, RATIOS, STYLE_SUFFIXES, chat } from '@/lib/pollinations'
 import { storage } from '@/lib/storage'
-import BYOPModal from '@/components/BYOPModal'
-import { 
-  ArrowPathIcon, 
-  ArrowDownTrayIcon,
-  SparklesIcon,
-  XMarkIcon 
-} from '@heroicons/react/24/outline'
 
-const TABS = [
-  { id: 'generate', label: 'Generate', icon: '🎨' },
-  { id: 'remove-bg', label: 'Remove BG', icon: '✂️' },
-  { id: 'sticker', label: 'Sticker', icon: '🏷️' }
-]
-
-const MODELS = [
-  { id: 'flux', name: 'Flux Schnell', free: true },
-  { id: 'zimage', name: 'Z-Image Turbo', free: true },
-  { id: 'klein', name: 'Flux Klein', free: false },
-  { id: 'grok-imagine', name: 'Grok Imagine', free: false }
-]
-
-const RATIOS = [
-  { id: '1:1', label: 'Square', w: 1024, h: 1024 },
-  { id: '3:4', label: 'Portrait', w: 768, h: 1024 },
-  { id: '4:3', label: 'Landscape', w: 1024, h: 768 },
-  { id: '9:16', label: 'Story', w: 576, h: 1024 },
-  { id: '16:9', label: 'Widescreen', w: 1024, h: 576 }
-]
-
-const STYLES = [
-  { id: 'none', label: 'Default', suffix: '' },
-  { id: 'artistic', label: 'Artistic', suffix: ', artistic style, painterly, expressive' },
-  { id: 'realistic', label: 'Realistic', suffix: ', photorealistic, highly detailed, 8k' },
-  { id: '3d', label: '3D Render', suffix: ', 3D render, octane render, volumetric lighting' },
-  { id: 'anime', label: 'Anime', suffix: ', anime style, vibrant colors, cel shaded' },
-  { id: 'pixel', label: 'Pixel Art', suffix: ', pixel art, 16-bit, retro game style' },
-  { id: 'cyberpunk', label: 'Cyberpunk', suffix: ', cyberpunk, neon lights, futuristic' },
-  { id: 'fantasy', label: 'Fantasy', suffix: ', fantasy art, magical, epic' }
+const CREATIVE_PRESETS = [
+  { id: 'wallpaper', label: '🖼 Wallpaper', ratio: '9:16', style: 'cinematic', suffix: ', ultra detailed, premium wallpaper' },
+  { id: 'logo',      label: '🏷 Logo',      ratio: '1:1',  style: 'logo',      suffix: ', vector logo, transparent bg friendly' },
+  { id: 'banner',    label: '📢 Banner',    ratio: '16:9', style: 'none',      suffix: ', banner design, wide format, bold' },
+  { id: 'thumb',     label: '▶ Thumbnail', ratio: '16:9', style: 'cinematic', suffix: ', youtube thumbnail, eye-catching, bold text space' },
+  { id: 'sticker',   label: '🏷 Sticker',  ratio: '1:1',  style: 'none',      suffix: ', sticker design, white outline, cute, transparent background' },
+  { id: 'pfp',       label: '👤 PFP',      ratio: '1:1',  style: 'artistic',  suffix: ', profile picture, portrait, centered' },
 ]
 
 export default function ImagePage() {
   const [tab, setTab] = useState('generate')
   const [prompt, setPrompt] = useState('')
-  const [enhancedPrompt, setEnhancedPrompt] = useState('')
-  const [showEnhance, setShowEnhance] = useState(false)
-  const [images, setImages] = useState([])
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [showBYOP, setShowBYOP] = useState(false)
-  
-  // Settings
   const [model, setModel] = useState('flux')
   const [ratio, setRatio] = useState('1:1')
   const [style, setStyle] = useState('none')
   const [count, setCount] = useState(1)
-  
-  const handleGenerate = async () => {
+  const [images, setImages] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [enhancing, setEnhancing] = useState(false)
+  const [enhanced, setEnhanced] = useState('')
+  const [showEnhanced, setShowEnhanced] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [preset, setPreset] = useState(null)
+
+  // Load prefilled prompt from story mode
+  useEffect(() => {
+    const pre = sessionStorage.getItem('prefill_prompt')
+    if (pre) { setPrompt(pre); sessionStorage.removeItem('prefill_prompt') }
+  }, [])
+
+  const generate = async () => {
     if (!prompt.trim()) return
-    
-    const selectedModel = MODELS.find(m => m.id === model)
-    if (!selectedModel.free && !pollinations.pollenKey) {
-      setShowBYOP(true)
-      return
-    }
-    
-    setIsGenerating(true)
+    setLoading(true)
     setImages([])
-    
     try {
-      const selectedStyle = STYLES.find(s => s.id === style)
-      const finalPrompt = prompt + selectedStyle.suffix
-      const selectedRatio = RATIOS.find(r => r.id === ratio)
-      
-      const results = []
-      for (let i = 0; i < count; i++) {
-        const img = await pollinations.generateImage(finalPrompt, {
-          model,
-          width: selectedRatio.w,
-          height: selectedRatio.h,
-          seed: Date.now() + i
-        })
-        results.push(img)
-        
-        // Show images as they generate
-        setImages(prev => [...prev, img])
-      }
-      
-      // Save to history
-      results.forEach(img => storage.addImageHistory(img))
-      
-    } catch (error) {
-      console.error('Generation error:', error)
-      if (error.message === 'pollen_quota_exceeded') {
-        setShowBYOP(true)
-      } else {
-        alert(`error: ${error.message}`)
-      }
+      const r = RATIOS.find(r => r.id === ratio) || RATIOS[0]
+      const styleSuffix = STYLE_SUFFIXES[style] || ''
+      const presetSuffix = preset ? CREATIVE_PRESETS.find(p => p.id === preset)?.suffix || '' : ''
+      const finalPrompt = prompt + styleSuffix + presetSuffix
+
+      const urls = Array.from({ length: count }, () =>
+        buildImageUrl(finalPrompt, { model, width: r.w, height: r.h })
+      )
+      setImages(urls)
+      urls.forEach(url => storage.addImage({ url, prompt: finalPrompt, model, ratio, style }))
+    } catch (e) {
+      alert('bruh: ' + e.message)
     } finally {
-      setIsGenerating(false)
+      setLoading(false)
     }
   }
-  
-  const handleEnhance = async () => {
+
+  const enhance = async () => {
     if (!prompt.trim()) return
-    
-    setShowEnhance(true)
+    setEnhancing(true)
     try {
-      const response = await pollinations.chat([{
-        role: 'user',
-        content: `Enhance this image prompt for better AI generation results. Make it more descriptive and detailed. Original prompt: "${prompt}"`
-      }], { model: 'mistral' })
-      
-      setEnhancedPrompt(response.content)
-    } catch (error) {
-      setEnhancedPrompt('Failed to enhance prompt. Try again?')
+      const result = await chat(
+        [{ role: 'user', content: `Enhance this image generation prompt to be more detailed and vivid. Keep it under 200 words. Only output the enhanced prompt, nothing else.\n\nOriginal: "${prompt}"` }],
+        'mistral', ''
+      )
+      setEnhanced(result)
+      setShowEnhanced(true)
+    } catch (e) {
+      alert('enhance failed: ' + e.message)
+    } finally {
+      setEnhancing(false)
     }
   }
-  
-  const useEnhancedPrompt = () => {
-    setPrompt(enhancedPrompt)
-    setShowEnhance(false)
+
+  const handlePreset = (p) => {
+    setPreset(p.id)
+    setRatio(p.ratio)
+    setStyle(p.style)
   }
-  
-  const downloadImage = async (url, index) => {
-    try {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = `wildai-${Date.now()}-${index}.png`
-      a.click()
-      
-      URL.revokeObjectURL(blobUrl)
-    } catch (error) {
-      console.error('Download error:', error)
-      // Fallback: open in new tab
-      window.open(url, '_blank')
-    }
-  }
-  
+
   return (
-    <div className="container py-6">
-      
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-              tab === t.id
-                ? 'bg-[var(--accent)] text-white'
-                : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'
-            }`}
-          >
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
+    <div className="ct" style={{ paddingTop: '16px', paddingBottom: '32px' }}>
+      <div className="tabs" style={{ marginBottom: '16px' }}>
+        <button className={`tab ${tab === 'generate' ? 'active' : ''}`} onClick={() => setTab('generate')}>🎨 Generate</button>
+        <button className={`tab ${tab === 'creative' ? 'active' : ''}`} onClick={() => setTab('creative')}>✨ Creative</button>
+        <button className={`tab ${tab === 'edit' ? 'active' : ''}`} onClick={() => setTab('edit')}>🔧 Edit (soon)</button>
       </div>
-      
-      {tab === 'generate' && (
+
+      {(tab === 'generate' || tab === 'creative') && (
         <>
-          {/* Settings Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {tab === 'creative' && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              {CREATIVE_PRESETS.map(p => (
+                <button
+                  key={p.id}
+                  className={`btn btn-sm ${preset === p.id ? 'btn-p' : 'btn-s'}`}
+                  onClick={() => handlePreset(p)}
+                >{p.label}</button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: '12px' }}>
             <div>
-              <label className="block text-sm font-medium mb-1">Model</label>
-              <select value={model} onChange={e => setModel(e.target.value)} className="w-full text-sm">
-                {MODELS.map(m => (
-                  <option key={m.id} value={m.id} disabled={!m.free && !pollinations.pollenKey}>
-                    {m.name} {!m.free && '🔒'}
-                  </option>
-                ))}
+              <label style={{ fontSize: '0.75rem', color: 'var(--fg3)', display: 'block', marginBottom: '4px' }}>model</label>
+              <select value={model} onChange={e => setModel(e.target.value)}>
+                {FREE_IMAGE_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
-            
             <div>
-              <label className="block text-sm font-medium mb-1">Ratio</label>
-              <select value={ratio} onChange={e => setRatio(e.target.value)} className="w-full text-sm">
-                {RATIOS.map(r => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
+              <label style={{ fontSize: '0.75rem', color: 'var(--fg3)', display: 'block', marginBottom: '4px' }}>ratio</label>
+              <select value={ratio} onChange={e => setRatio(e.target.value)}>
+                {RATIOS.map(r => <option key={r.id} value={r.id}>{r.id} {r.label}</option>)}
               </select>
             </div>
-            
             <div>
-              <label className="block text-sm font-medium mb-1">Style</label>
-              <select value={style} onChange={e => setStyle(e.target.value)} className="w-full text-sm">
-                {STYLES.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
+              <label style={{ fontSize: '0.75rem', color: 'var(--fg3)', display: 'block', marginBottom: '4px' }}>style</label>
+              <select value={style} onChange={e => setStyle(e.target.value)}>
+                {Object.keys(STYLE_SUFFIXES).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            
             <div>
-              <label className="block text-sm font-medium mb-1">Count</label>
-              <input
-                type="number"
-                min="1"
-                max="5"
-                value={count}
-                onChange={e => setCount(parseInt(e.target.value) || 1)}
-                className="w-full text-sm"
-              />
+              <label style={{ fontSize: '0.75rem', color: 'var(--fg3)', display: 'block', marginBottom: '4px' }}>count (1-5)</label>
+              <input type="number" min={1} max={5} value={count} onChange={e => setCount(Math.min(5, Math.max(1, +e.target.value)))} />
             </div>
           </div>
-          
-          {/* Prompt Input */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder="describe what you want to see..."
-              rows={4}
-              className="w-full"
-            />
-            
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={handleEnhance}
-                className="btn btn-secondary flex items-center gap-2"
-              >
-                <SparklesIcon className="w-4 h-4" />
-                Enhance Prompt
-              </button>
-              
-              <button
-                onClick={handleGenerate}
-                disabled={!prompt.trim() || isGenerating}
-                className="btn btn-primary flex-1"
-              >
-                {isGenerating ? `Generating ${images.length}/${count}...` : `Generate (${count})`}
-              </button>
-            </div>
+
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder="describe what you want to see..."
+            rows={3}
+            style={{ marginBottom: '8px' }}
+          />
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <button className="btn btn-s btn-sm" onClick={enhance} disabled={enhancing || !prompt.trim()}>
+              {enhancing ? '⏳ enhancing...' : '✨ enhance prompt'}
+            </button>
+            <button className="btn btn-p" style={{ flex: 1 }} onClick={generate} disabled={loading || !prompt.trim()}>
+              {loading ? 'generating...' : `generate (${count})`}
+            </button>
           </div>
-          
-          {/* Enhanced Prompt Modal */}
-          {showEnhance && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-[var(--bg-primary)] rounded-2xl p-6 max-w-2xl w-full border border-[var(--border)]">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold">✨ Enhanced Prompt</h3>
-                  <button onClick={() => setShowEnhance(false)}>
-                    <XMarkIcon className="w-6 h-6" />
-                  </button>
+
+          {/* enhanced prompt modal */}
+          {showEnhanced && (
+            <div className="modal-overlay" onClick={() => setShowEnhanced(false)}>
+              <div className="modal-box" style={{ padding: '20px' }} onClick={e => e.stopPropagation()}>
+                <h3 style={{ marginBottom: '8px' }}>✨ enhanced prompt</h3>
+                <div className="card" style={{ marginBottom: '12px', fontSize: '0.8rem', lineHeight: 1.6, maxHeight: '200px', overflowY: 'auto' }}>
+                  {enhanced}
                 </div>
-                
-                <div className="bg-[var(--bg-secondary)] rounded-lg p-4 mb-4 max-h-60 overflow-y-auto">
-                  <p className="whitespace-pre-wrap">{enhancedPrompt}</p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button onClick={useEnhancedPrompt} className="btn btn-primary flex-1">
-                    Use This Prompt
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-p" style={{ flex: 1 }} onClick={() => { setPrompt(enhanced); setShowEnhanced(false) }}>
+                    use this ✓
                   </button>
-                  <button onClick={() => setShowEnhance(false)} className="btn btn-secondary">
-                    Cancel
-                  </button>
+                  <button className="btn btn-s" onClick={() => setShowEnhanced(false)}>nah close</button>
                 </div>
               </div>
             </div>
           )}
-          
-          {/* Generated Images */}
+
+          {/* results */}
           {images.length > 0 && (
             <div>
-              <h3 className="text-lg font-bold mb-3">Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {images.map((img, i) => (
-                  <div key={i} className="card group relative overflow-hidden">
-                    <img
-                      src={img.url}
-                      alt={img.prompt}
-                      className="w-full h-auto rounded-lg"
-                      loading="lazy"
-                    />
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                      <div className="flex gap-2 w-full">
-                        <button
-                          onClick={() => downloadImage(img.url, i)}
-                          className="btn btn-primary flex-1 text-sm"
-                        >
-                          <ArrowDownTrayIcon className="w-4 h-4" />
-                          Download
-                        </button>
-                        <button className="btn btn-secondary text-sm">
-                          Share
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2">
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {img.model} · {img.dimensions}
-                      </p>
-                    </div>
+              <h3 style={{ marginBottom: '10px' }}>results 🎉</h3>
+              <div className="img-grid">
+                {images.map((url, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setPreview(url)}
+                    style={{ aspectRatio: ratio.replace(':', '/'), borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--bd)' }}
+                  >
+                    <img src={url} alt={`gen ${i+1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   </div>
                 ))}
               </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--fg3)', marginTop: '8px', marginBottom: 0 }}>
+                💾 auto-saved to <a href="/history?tab=image">history</a>
+              </p>
             </div>
           )}
-          
-          <p className="text-xs text-[var(--text-muted)] text-center mt-6">
-            💾 images auto-saved to{' '}
-            <a href="/history?tab=image" className="text-[var(--accent)] hover:underline">
-              history
-            </a>
-          </p>
         </>
       )}
-      
-      {tab === 'remove-bg' && (
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-4">🚧 Background Remover</h2>
-          <p className="text-[var(--text-secondary)] mb-6">
-            coming soon! powered by remove.bg API
-            <br />
-            (50 free uses per month once it's live)
-          </p>
-          <button className="btn btn-secondary" disabled>
-            Upload Image (Soon)
-          </button>
+
+      {tab === 'edit' && (
+        <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--fg3)' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔧</div>
+          <h2>coming soon fr</h2>
+          <p>remove bg, sticker maker, image editing... cooking rn 🍳</p>
         </div>
       )}
-      
-      {tab === 'sticker' && (
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-4">🏷️ Sticker Maker</h2>
-          <p className="text-[var(--text-secondary)] mb-6">
-            turn anything into a sticker
-            <br />
-            (auto transparent background + border)
-          </p>
-          <button className="btn btn-secondary" disabled>
-            Create Sticker (Soon)
-          </button>
+
+      {/* preview modal */}
+      {preview && (
+        <div className="modal-overlay" onClick={() => setPreview(null)}>
+          <div style={{ maxWidth: '600px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <img src={preview} alt="preview" style={{ width: '100%', borderRadius: '12px', display: 'block' }} />
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px', justifyContent: 'center' }}>
+              <a href={preview} download={`wildai-${Date.now()}.jpg`} target="_blank" className="btn btn-p btn-sm">⬇ download</a>
+              <button className="btn btn-s btn-sm" onClick={() => setPreview(null)}>close</button>
+            </div>
+          </div>
         </div>
       )}
-      
-      <BYOPModal
-        isOpen={showBYOP}
-        onClose={() => setShowBYOP(false)}
-        onSave={(key) => {
-          pollinations.setPollenKey(key)
-          setShowBYOP(false)
-        }}
-      />
     </div>
   )
 }
