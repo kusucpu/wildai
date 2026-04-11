@@ -1,324 +1,144 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
-import { storage } from '@/lib/storage'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { 
-  TrashIcon, 
-  ArrowDownTrayIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  XMarkIcon,
-  ClipboardDocumentIcon
-} from '@heroicons/react/24/outline'
+import { storage } from '@/lib/storage'
 
-// Separate component for search params logic
 function HistoryContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const initialTab = searchParams.get('tab') || 'chat'
-  
-  const [tab, setTab] = useState(initialTab)
-  const [chatHistory, setChatHistory] = useState([])
-  const [imageHistory, setImageHistory] = useState([])
-  const [selectedImage, setSelectedImage] = useState(null)
-  const [stats, setStats] = useState({ used: 0, total: 0, percentage: 0 })
-  
-  useEffect(() => {
-    loadHistory()
-  }, [])
-  
-  const loadHistory = () => {
-    setChatHistory(storage.load('chat_history') || [])
-    setImageHistory(storage.load('image_history') || [])
+  const [tab, setTab] = useState(searchParams.get('tab') || 'chat')
+  const [chats, setChats] = useState([])
+  const [images, setImages] = useState([])
+  const [stats, setStats] = useState({ usedMB: '0', totalMB: '100', pct: '0' })
+  const [imgModal, setImgModal] = useState(null)
+  const [imgIdx, setImgIdx] = useState(0)
+
+  const load = () => {
+    setChats(storage.getChats())
+    setImages(storage.getImages())
     setStats(storage.getStats())
   }
-  
-  const deleteChat = (id) => {
-    if (confirm('delete this conversation?')) {
-      storage.deleteItem('chat', id)
-      loadHistory()
-    }
+
+  useEffect(() => { load() }, [])
+
+  const openImg = (img, idx) => { setImgModal(img); setImgIdx(idx) }
+  const navigateImg = (dir) => {
+    const newIdx = imgIdx + dir
+    if (newIdx >= 0 && newIdx < images.length) { setImgModal(images[newIdx]); setImgIdx(newIdx) }
   }
-  
-  const deleteImage = (id) => {
-    if (confirm('delete this image?')) {
-      storage.deleteItem('image', id)
-      loadHistory()
-    }
-  }
-  
-  const clearAll = (type) => {
-    const confirmMsg = type === 'chat' 
-      ? 'delete ALL conversations? this cannot be undone.'
-      : 'delete ALL images? this cannot be undone.'
-    
-    if (confirm(confirmMsg)) {
-      storage.clearHistory(type)
-      loadHistory()
-    }
-  }
-  
-  const openChat = (chat) => {
-    localStorage.setItem('load_chat', JSON.stringify(chat))
-    router.push('/chat')
-  }
-  
-  const downloadImage = async (url, id) => {
-    try {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = `wildai-${id}.png`
-      a.click()
-      
-      URL.revokeObjectURL(blobUrl)
-    } catch (error) {
-      window.open(url, '_blank')
-    }
-  }
-  
-  const ImageModal = ({ image, onClose }) => {
-    if (!image) return null
-    
-    const currentIndex = imageHistory.findIndex(img => img.id === image.id)
-    const hasPrev = currentIndex > 0
-    const hasNext = currentIndex < imageHistory.length - 1
-    
-    const navigate = (direction) => {
-      const newIndex = currentIndex + direction
-      if (newIndex >= 0 && newIndex < imageHistory.length) {
-        setSelectedImage(imageHistory[newIndex])
-      }
-    }
-    
-    const copyPrompt = () => {
-      navigator.clipboard.writeText(image.prompt)
-    }
-    
-    return (
-      <div 
-        className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <div className="max-w-6xl w-full" onClick={e => e.stopPropagation()}>
-          
-          <div className="relative">
-            <img
-              src={image.url}
-              alt={image.prompt}
-              className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
-            />
-            
-            {hasPrev && (
-              <button
-                onClick={() => navigate(-1)}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm transition-all"
-              >
-                <ChevronLeftIcon className="w-6 h-6 text-white" />
-              </button>
-            )}
-            
-            {hasNext && (
-              <button
-                onClick={() => navigate(1)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm transition-all"
-              >
-                <ChevronRightIcon className="w-6 h-6 text-white" />
-              </button>
-            )}
-            
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm"
-            >
-              <XMarkIcon className="w-6 h-6 text-white" />
-            </button>
-          </div>
-          
-          <div className="mt-4 bg-white/5 backdrop-blur-sm rounded-lg p-4">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex-1 max-h-20 overflow-y-auto">
-                <p className="text-white text-sm">{image.prompt}</p>
-              </div>
-              <button
-                onClick={copyPrompt}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-white text-sm flex items-center gap-1"
-              >
-                <ClipboardDocumentIcon className="w-4 h-4" />
-                Copy
-              </button>
-            </div>
-            
-            <div className="flex gap-2 text-xs text-white/60">
-              <span>{image.model}</span>
-              <span>·</span>
-              <span>{image.dimensions}</span>
-              <span>·</span>
-              <span>{new Date(image.timestamp).toLocaleDateString()}</span>
-            </div>
-            
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => downloadImage(image.url, image.id)}
-                className="flex-1 btn btn-primary text-sm"
-              >
-                <ArrowDownTrayIcon className="w-4 h-4" />
-                Download
-              </button>
-              <button
-                onClick={() => deleteImage(image.id)}
-                className="btn btn-secondary text-sm"
-              >
-                <TrashIcon className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-  
+
   return (
-    <div className="container py-6">
-      
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">📜 History</h1>
-        <p className="text-sm text-[var(--danger)] mb-2">
-          ⚠️ Storage limit: {stats.usedMB}MB / {stats.totalMB}MB ({stats.percentage}%)
-          <br />
-          Oldest items auto-delete when storage is full.
+    <div className="ct" style={{ paddingTop: '16px', paddingBottom: '32px' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <h1 style={{ marginBottom: '4px' }}>📜 History</h1>
+        <p style={{ color: 'var(--danger)', fontSize: '0.75rem', marginBottom: 0 }}>
+          ⚠️ local storage: {stats.usedMB}MB / {stats.totalMB}MB ({stats.pct}%) — oldest stuff gets auto-deleted when full
         </p>
       </div>
-      
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setTab('chat')}
-          className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-            tab === 'chat'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'
-          }`}
-        >
-          💬 Chat ({chatHistory.length})
-        </button>
-        <button
-          onClick={() => setTab('image')}
-          className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-            tab === 'image'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)]'
-          }`}
-        >
-          🎨 Images ({imageHistory.length})
-        </button>
+
+      <div className="tabs" style={{ marginBottom: '16px' }}>
+        <button className={`tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>💬 Chat ({chats.length})</button>
+        <button className={`tab ${tab === 'image' ? 'active' : ''}`} onClick={() => setTab('image')}>🎨 Images ({images.length})</button>
       </div>
-      
+
       {tab === 'chat' && (
-        <div className="space-y-3">
-          {chatHistory.length === 0 ? (
-            <div className="text-center py-12 text-[var(--text-muted)]">
-              <p>no chat history yet</p>
-              <a href="/chat" className="text-[var(--accent)] hover:underline mt-2 inline-block">
-                start chatting →
-              </a>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {chats.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--fg3)' }}>
+              <p>no chat history yet bestie</p>
+              <a href="/chat" className="btn btn-s btn-sm">start chatting →</a>
             </div>
           ) : (
             <>
-              {chatHistory.map(chat => (
-                <div key={chat.id} className="card flex justify-between items-center gap-4">
-                  <div className="flex-1 cursor-pointer" onClick={() => openChat(chat)}>
-                    <p className="font-medium mb-1">{chat.preview}</p>
-                    <div className="flex gap-2 text-xs text-[var(--text-muted)]">
-                      <span>{chat.mode}</span>
-                      <span>·</span>
-                      <span>{chat.messages?.length || 0} messages</span>
-                      <span>·</span>
-                      <span>{new Date(chat.timestamp).toLocaleDateString()}</span>
-                    </div>
+              {chats.map(c => (
+                <div key={c.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <div style={{ flex: 1 }} onClick={() => { sessionStorage.setItem('load_chat', JSON.stringify(c)); router.push('/chat') }}>
+                    <p style={{ fontWeight: 500, marginBottom: '2px', fontSize: '0.875rem', color: 'var(--fg)' }}>{c.preview}</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginBottom: 0 }}>
+                      {c.mode} · {c.messages?.length || 0} msgs · {new Date(c.ts).toLocaleDateString()}
+                    </p>
                   </div>
                   <button
-                    onClick={() => deleteChat(chat.id)}
-                    className="p-2 hover:bg-[var(--danger)]/10 text-[var(--danger)] rounded transition-colors"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
+                    onClick={() => { if (confirm('fr delete this? 👀')) { storage.deleteChat(c.id); load() } }}
+                    className="icon-btn"
+                    style={{ flexShrink: 0, color: 'var(--danger)' }}
+                  >✕</button>
                 </div>
               ))}
-              
               <button
-                onClick={() => clearAll('chat')}
-                className="w-full py-3 text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded-lg transition-colors font-medium"
+                onClick={() => { if (confirm('DELETE ALL CHATS?? u sure no cap?')) { storage.clearChats(); load() } }}
+                className="btn btn-d"
+                style={{ marginTop: '8px' }}
               >
-                Delete All Chats
+                🗑 delete all chats
               </button>
             </>
           )}
         </div>
       )}
-      
+
       {tab === 'image' && (
         <div>
-          {imageHistory.length === 0 ? (
-            <div className="text-center py-12 text-[var(--text-muted)]">
-              <p>no images generated yet</p>
-              <a href="/image" className="text-[var(--accent)] hover:underline mt-2 inline-block">
-                generate images →
-              </a>
+          {images.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--fg3)' }}>
+              <p>no images yet, go generate something cool</p>
+              <a href="/image" className="btn btn-s btn-sm">generate images →</a>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-                {imageHistory.map(img => (
-                  <div
-                    key={img.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--accent)] transition-all group relative"
-                    onClick={() => setSelectedImage(img)}
-                  >
-                    <img
-                      src={img.url}
-                      alt={img.prompt}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
-                      <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-medium">
-                        View
-                      </span>
-                    </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '12px' }}>
+                {images.map((img, i) => (
+                  <div key={img.id} onClick={() => openImg(img, i)} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer', background: 'var(--bg3)', border: '1px solid var(--bd)' }}>
+                    <img src={img.url} alt={img.prompt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   </div>
                 ))}
               </div>
-              
               <button
-                onClick={() => clearAll('image')}
-                className="w-full py-3 text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded-lg transition-colors font-medium"
+                onClick={() => { if (confirm('nuke ALL images?? 💀')) { storage.clearImages(); load() } }}
+                className="btn btn-d"
               >
-                Delete All Images
+                🗑 delete all images
               </button>
             </>
           )}
         </div>
       )}
-      
-      <ImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />
+
+      {/* image modal */}
+      {imgModal && (
+        <div className="modal-overlay" onClick={() => setImgModal(null)}>
+          <div style={{ maxWidth: '600px', width: '100%', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <img src={imgModal.url} alt={imgModal.prompt} style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+
+            {imgIdx > 0 && (
+              <button onClick={() => navigateImg(-1)} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem' }}>‹</button>
+            )}
+            {imgIdx < images.length - 1 && (
+              <button onClick={() => navigateImg(1)} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1rem' }}>›</button>
+            )}
+
+            <div className="card" style={{ marginTop: '8px', borderRadius: '10px' }}>
+              <div style={{ maxHeight: '80px', overflowY: 'auto', marginBottom: '8px' }}>
+                <p style={{ fontSize: '0.8rem', margin: 0, color: 'var(--fg)' }}>{imgModal.prompt}</p>
+              </div>
+              <p style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginBottom: '10px' }}>{imgModal.model} · {new Date(imgModal.ts).toLocaleDateString()}</p>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn btn-s btn-sm" onClick={() => navigator.clipboard.writeText(imgModal.prompt)}>📋 copy prompt</button>
+                <a href={imgModal.url} download={`wildai-${imgModal.id}.jpg`} target="_blank" className="btn btn-p btn-sm">⬇ download</a>
+                <button className="btn btn-d btn-sm" onClick={() => { storage.deleteImage(imgModal.id); setImgModal(null); load() }}>🗑</button>
+                <button className="btn btn-s btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setImgModal(null)}>✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// Main export with Suspense wrapper
 export default function HistoryPage() {
   return (
-    <Suspense fallback={
-      <div className="container py-6">
-        <div className="text-center py-12">
-          <p className="text-[var(--text-muted)]">Loading history...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--fg3)' }}>loading...</div>}>
       <HistoryContent />
     </Suspense>
   )
