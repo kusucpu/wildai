@@ -28,7 +28,7 @@ export default function Home() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
           <FeatureCard icon="💬" title="Chat (no cap)" desc="regular chat, tarot readings, astrology, emotional support, interactive stories. pick your vibe." href="/chat" />
           <FeatureCard icon="🎨" title="Image Gen" desc="flux & z-image models. wallpapers, logos, thumbnails, stickers. free, no key needed." href="/image" />
-          <FeatureCard icon="⚡" title="God Prompts" desc="battle-tested system prompts. copy, paste, become prompt engineer overnight. no gatekeeping." href="/god-prompt" />
+          <FeatureCard icon="⚡" title="Wild Prompts" desc="battle-tested system prompts. copy, paste, become prompt engineer overnight. no gatekeeping." href="/god-prompt" />
           <FeatureCard icon="📜" title="History" desc="all your chats and generated images saved locally. 100MB limit, auto-cleanup. your data, your device." href="/history" />
           <FeatureCard icon="📰" title="Articles" desc="deep dives & tutorials. still brewing in the background..." href="/articles" badge="soon" />
           <FeatureCard icon="🎮" title="Games" desc="mini games incoming. give me a moment im just one person lol" href="/game" badge="soon" />
