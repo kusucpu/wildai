@@ -19,6 +19,7 @@ export default function RootLayout({ children }) {
         <meta name="description" content="Free AI chat, image gen, and creative tools. No paywalls, no corporate energy." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
         <meta name="theme-color" content="#7c3aed" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
