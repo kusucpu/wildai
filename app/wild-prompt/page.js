@@ -1,22 +1,26 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { chat } from '@/lib/pollinations'
 import { GOD_PROMPTS, META_PROMPT_SYSTEM } from '@/lib/prompts'
 import BYOPModal from '@/components/BYOPModal'
 import { useConfirm } from '@/components/ConfirmModal'
+import { storage } from '@/lib/storage'
 
 export default function WildPromptPage() {
-  const [tab, setTab] = useState('library')
-  const [search, setSearch] = useState('')
-  const [copied, setCopied] = useState(null)
-  const [preview, setPreview] = useState(null)
+  const [tab, setTab]           = useState('library')
+  const [search, setSearch]     = useState('')
+  const [copied, setCopied]     = useState(null)
+  const [preview, setPreview]   = useState(null)
   const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const [showBYOP, setShowBYOP] = useState(false)
-  const [builderHistory, setBuilderHistory] = useState([])
-  const [activeSession, setActiveSession] = useState(null)
-  const { confirm, Modal } = useConfirm()
+  const [sessions, setSessions] = useState([])
+  const [activeId, setActiveId] = useState(null)
+  const { confirm, Modal }      = useConfirm()
+
+  // Load sessions from localStorage on mount
+  useEffect(() => { setSessions(storage.getWildSessions()) }, [])
 
   const filtered = GOD_PROMPTS.filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -25,57 +29,46 @@ export default function WildPromptPage() {
 
   const copy = (text, id) => {
     navigator.clipboard.writeText(text)
-    setCopied(id)
-    setTimeout(() => setCopied(null), 2000)
+    setCopied(id); setTimeout(() => setCopied(null), 2000)
   }
 
   const sendMeta = async () => {
     if (!input.trim() || loading) return
     const userMsg = { role: 'user', content: input.trim() }
     const newMsgs = [...messages, userMsg]
-    setMessages(newMsgs)
-    setInput('')
-    setLoading(true)
+    setMessages(newMsgs); setInput(''); setLoading(true)
     try {
       const content = await chat(newMsgs, 'openai-fast', META_PROMPT_SYSTEM)
       const finalMsgs = [...newMsgs, { role: 'assistant', content }]
       setMessages(finalMsgs)
-
-      // save to builder history
       const session = {
-        id: activeSession || Date.now(),
+        id: activeId || Date.now(),
         ts: new Date().toISOString(),
         preview: newMsgs[0]?.content?.slice(0, 60) || 'session',
         messages: finalMsgs
       }
-      setActiveSession(session.id)
-      setBuilderHistory(prev => {
-        const filtered = prev.filter(s => s.id !== session.id)
-        return [session, ...filtered].slice(0, 20)
-      })
+      setActiveId(session.id)
+      storage.saveWildSession(session)
+      setSessions(storage.getWildSessions())
     } catch (e) {
       if (e.message === 'quota_exceeded') setShowBYOP(true)
       else setMessages(prev => [...prev, { role: 'system', content: 'api broke: ' + e.message }])
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
-  const loadSession = (session) => {
-    setMessages(session.messages)
-    setActiveSession(session.id)
-    setTab('builder')
-  }
+  const loadSession = (s) => { setMessages(s.messages); setActiveId(s.id); setTab('builder') }
 
   const deleteSession = async (id) => {
     const ok = await confirm('delete this session?')
-    if (ok) setBuilderHistory(prev => prev.filter(s => s.id !== id))
+    if (ok) { storage.deleteWildSession(id); setSessions(storage.getWildSessions()) }
   }
 
   const clearAll = async () => {
-    const ok = await confirm('nuke all builder history? 💀')
-    if (ok) { setBuilderHistory([]); setMessages([]); setActiveSession(null) }
+    const ok = await confirm('nuke all sessions? 💀')
+    if (ok) { storage.clearWildSessions(); setSessions([]); setMessages([]); setActiveId(null) }
   }
+
+  const newSession = () => { setMessages([]); setActiveId(null); setTab('builder') }
 
   return (
     <div className="ct" style={{ paddingTop: '16px', paddingBottom: '32px' }}>
@@ -88,7 +81,7 @@ export default function WildPromptPage() {
         <button className={`tab ${tab === 'library' ? 'active' : ''}`} onClick={() => setTab('library')}>Library</button>
         <button className={`tab ${tab === 'builder' ? 'active' : ''}`} onClick={() => setTab('builder')}>AI Builder</button>
         <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
-          My Sessions {builderHistory.length > 0 && `(${builderHistory.length})`}
+          Sessions {sessions.length > 0 && `(${sessions.length})`}
         </button>
       </div>
 
@@ -131,31 +124,59 @@ export default function WildPromptPage() {
             )}
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.role === 'user' ? 'user' : m.role === 'system' ? 'sys' : 'ai'}`}>
-                <div className="msg-bubble">
+                <div className="msg-bubble" style={{ position: 'relative' }}>
                   <div className="msg-label">{m.role === 'user' ? 'you' : m.role === 'system' ? 'error' : 'engine'}</div>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.8rem' }}>{m.content}</pre>
+                  {m.role === 'assistant' ? (
+                    <>
+                      {/* copy button for AI responses */}
+                      <button
+                        onClick={() => copy(m.content, `msg-${i}`)}
+                        style={{ position: 'absolute', top: '6px', right: '6px', background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: '6px', padding: '2px 8px', fontSize: '0.65rem', cursor: 'pointer', color: 'var(--fg2)' }}
+                      >{copied === `msg-${i}` ? 'copied!' : 'copy'}</button>
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.8rem', paddingRight: '56px' }}>{m.content}</pre>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '0.875rem' }}>{m.content}</div>
+                  )}
                 </div>
               </div>
             ))}
-            {loading && <div className="msg ai"><div className="msg-bubble"><div className="dots"><div className="dot" /><div className="dot" /><div className="dot" /></div></div></div>}
+            {loading && (
+              <div className="msg ai">
+                <div className="msg-bubble">
+                  <div className="msg-label">engine</div>
+                  <div className="dots"><div className="dot" /><div className="dot" /><div className="dot" /></div>
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--bd)', paddingTop: '8px' }}>
-            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMeta() } }} placeholder="describe your task..." rows={2} style={{ flex: 1, resize: 'none' }} />
-            <button className="btn btn-p" onClick={sendMeta} disabled={loading || !input.trim()}>send</button>
+          <div style={{ borderTop: '1px solid var(--bd)', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <textarea value={input} onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMeta() } }}
+                placeholder="describe your task..." rows={2} style={{ flex: 1, resize: 'none' }} />
+              <button className="btn btn-p" onClick={sendMeta} disabled={loading || !input.trim()}>send</button>
+            </div>
+            {messages.length > 0 && (
+              <button onClick={newSession} style={{ fontSize: '0.7rem', color: 'var(--fg3)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                + new session
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {builderHistory.length === 0 ? (
+          <button className="btn btn-s btn-sm" style={{ alignSelf: 'flex-start' }} onClick={newSession}>+ new session</button>
+          {sessions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--fg3)' }}>
-              <p>no sessions yet, go build something</p>
+              <p>no sessions yet</p>
               <button className="btn btn-s btn-sm" onClick={() => setTab('builder')}>open builder →</button>
             </div>
           ) : (
             <>
-              {builderHistory.map(s => (
+              {sessions.map(s => (
                 <div key={s.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => loadSession(s)}>
                     <p style={{ fontWeight: 500, marginBottom: '2px', fontSize: '0.875rem', color: 'var(--fg)' }}>{s.preview}</p>
