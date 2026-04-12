@@ -38,7 +38,7 @@ export default function Home() {
       {/* origin story */}
       <section className="card" style={{ marginBottom: '32px' }}>
         <h2 style={{ marginBottom: '12px' }}>how this cursed thing exists</h2>
-        <p>ngl this whole thing started during a 3am gabutting session. too much kopi, too much scrolling, thought "what if free AI tools didn't feel like they were designed by a committee of suits?" and just... started building.</p>
+        <p>ngl this whole thing started during a 3am boredom spiral. too much kopi, too much scrolling, thought "what if free AI tools didn't feel like they were designed by a committee of suits?" and just... started building.</p>
         <p>entire codebase written on a <strong>Xiaomi Redmi S2</strong> (cracked screen, questionable battery) using Acode app + free wifi + manual copy-paste to GitHub. no npm. no terminal (except openclaw for other stuff). pure chaos energy.</p>
         <p>huge thanks to: <a href="https://pollinations.ai" target="_blank" rel="noopener">Pollinations.ai</a> (the real MVP), <a href="https://vercel.com" target="_blank" rel="noopener">Vercel</a> (free hosting gods), <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>, and every AI that basically taught me to code. no VC. no ads. just spite against boring corporate tools.</p>
       </section>
