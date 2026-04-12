@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server'
 
+const FREE_IMG_IDS = ['flux', 'zimage', 'klein']
+
 export async function POST(req) {
   try {
-    const { prompt, model, width, height, seed, enhance, negativePrompt } = await req.json()
+    const { prompt, model, width, height, seed } = await req.json()
+
+    // Reject free models from hitting this route (should not happen)
+    if (FREE_IMG_IDS.includes(model)) {
+      return NextResponse.json({ error: 'use direct URL for free models' }, { status: 400 })
+    }
+
     const byopKey = req.headers.get('x-byop-key')
-    const apiKey = byopKey || process.env.POLLINATIONS_API_KEY
+    if (!byopKey) {
+      return NextResponse.json({ error: 'premium model needs BYOP key' }, { status: 401 })
+    }
 
     const params = new URLSearchParams({
-      model: model || 'flux',
-      width: String(width || 1024),
+      model:  model || 'flux',
+      width:  String(width || 1024),
       height: String(height || 1024),
-      seed: String(seed ?? Math.floor(Math.random() * 999999)),
+      seed:   String(seed ?? Math.floor(Math.random() * 999999)),
       nologo: 'true',
-      enhance: String(enhance || false),
+      key:    byopKey,
     })
-    if (negativePrompt) params.set('negative_prompt', negativePrompt)
-    if (apiKey) params.set('key', apiKey)
 
     const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?${params}`
     return NextResponse.json({ url })
