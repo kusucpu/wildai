@@ -163,14 +163,24 @@ input:focus, textarea:focus, select:focus {
   width: 2px;
   height: calc(100vh - var(--nav-t) - var(--nav-b));
   background: linear-gradient(to bottom, var(--ac), transparent);
-  transform-origin: top;
-  transform: scaleY(0);
-  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
   z-index: 999;
   pointer-events: none;
   border-radius: 2px;
+  opacity: 0;
 }
-.nav-beam.open { transform: scaleY(1); }
+.nav-beam.beam-open {
+  transform-origin: top;
+  animation: beamShoot 0.5s ease-out forwards;
+}
+.nav-beam.beam-close {
+  transform-origin: bottom;
+  animation: beamShoot 0.5s ease-out forwards;
+}
+@keyframes beamShoot {
+  0%   { transform: scaleY(0); opacity: 1; }
+  55%  { transform: scaleY(1); opacity: 0.9; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
 
 /* bottom nav */
 .bottom-nav {
