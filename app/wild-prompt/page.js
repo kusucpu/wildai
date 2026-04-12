@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { chat } from '@/lib/pollinations'
 import { GOD_PROMPTS, META_PROMPT_SYSTEM } from '@/lib/prompts'
 import BYOPModal from '@/components/BYOPModal'
+import { useConfirm } from '@/components/ConfirmModal'
 
-export default function GodPromptPage() {
+export default function WildPromptPage() {
   const [tab, setTab] = useState('library')
   const [search, setSearch] = useState('')
   const [copied, setCopied] = useState(null)
@@ -13,6 +14,9 @@ export default function GodPromptPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showBYOP, setShowBYOP] = useState(false)
+  const [builderHistory, setBuilderHistory] = useState([])
+  const [activeSession, setActiveSession] = useState(null)
+  const { confirm, Modal } = useConfirm()
 
   const filtered = GOD_PROMPTS.filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -34,35 +38,63 @@ export default function GodPromptPage() {
     setLoading(true)
     try {
       const content = await chat(newMsgs, 'openai-fast', META_PROMPT_SYSTEM)
-      setMessages([...newMsgs, { role: 'assistant', content }])
+      const finalMsgs = [...newMsgs, { role: 'assistant', content }]
+      setMessages(finalMsgs)
+
+      // save to builder history
+      const session = {
+        id: activeSession || Date.now(),
+        ts: new Date().toISOString(),
+        preview: newMsgs[0]?.content?.slice(0, 60) || 'session',
+        messages: finalMsgs
+      }
+      setActiveSession(session.id)
+      setBuilderHistory(prev => {
+        const filtered = prev.filter(s => s.id !== session.id)
+        return [session, ...filtered].slice(0, 20)
+      })
     } catch (e) {
       if (e.message === 'quota_exceeded') setShowBYOP(true)
-      else setMessages(prev => [...prev, { role: 'system', content: 'api broke lol: ' + e.message }])
+      else setMessages(prev => [...prev, { role: 'system', content: 'api broke: ' + e.message }])
     } finally {
       setLoading(false)
     }
   }
 
+  const loadSession = (session) => {
+    setMessages(session.messages)
+    setActiveSession(session.id)
+    setTab('builder')
+  }
+
+  const deleteSession = async (id) => {
+    const ok = await confirm('delete this session?')
+    if (ok) setBuilderHistory(prev => prev.filter(s => s.id !== id))
+  }
+
+  const clearAll = async () => {
+    const ok = await confirm('nuke all builder history? 💀')
+    if (ok) { setBuilderHistory([]); setMessages([]); setActiveSession(null) }
+  }
+
   return (
     <div className="ct" style={{ paddingTop: '16px', paddingBottom: '32px' }}>
+      <Modal />
       <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <h1>⚡ God Prompt</h1>
-        <p style={{ marginBottom: 0 }}>copy-paste ready prompts + AI prompt builder. no gatekeeping.</p>
+        <h1>Wild Prompt</h1>
       </div>
 
       <div className="tabs" style={{ marginBottom: '16px' }}>
-        <button className={`tab ${tab === 'library' ? 'active' : ''}`} onClick={() => setTab('library')}>📚 Library</button>
-        <button className={`tab ${tab === 'builder' ? 'active' : ''}`} onClick={() => setTab('builder')}>🤖 AI Builder</button>
+        <button className={`tab ${tab === 'library' ? 'active' : ''}`} onClick={() => setTab('library')}>Library</button>
+        <button className={`tab ${tab === 'builder' ? 'active' : ''}`} onClick={() => setTab('builder')}>AI Builder</button>
+        <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
+          My Sessions {builderHistory.length > 0 && `(${builderHistory.length})`}
+        </button>
       </div>
 
       {tab === 'library' && (
         <>
-          <input
-            placeholder="search prompts..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ marginBottom: '16px' }}
-          />
+          <input placeholder="search..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: '16px' }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
             {filtered.map(p => (
               <div key={p.id} className="card">
@@ -77,24 +109,24 @@ export default function GodPromptPage() {
                 {p.disclaimer && <p style={{ fontSize: '0.7rem', color: 'var(--warn)', marginBottom: '8px' }}>{p.disclaimer}</p>}
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button className="btn btn-p btn-sm" style={{ flex: 1 }} onClick={() => copy(p.template, p.id)}>
-                    {copied === p.id ? '✓ copied!' : '📋 copy'}
+                    {copied === p.id ? 'copied!' : 'copy'}
                   </button>
                   <button className="btn btn-s btn-sm" onClick={() => setPreview(p)}>preview</button>
                 </div>
               </div>
             ))}
           </div>
-          {filtered.length === 0 && <p style={{ textAlign: 'center', color: 'var(--fg3)' }}>no prompts found for "{search}" lol</p>}
+          {filtered.length === 0 && <p style={{ textAlign: 'center', color: 'var(--fg3)' }}>nothing found for "{search}"</p>}
         </>
       )}
 
       {tab === 'builder' && (
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 220px)' }}>
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '12px' }}>
             {messages.length === 0 && (
               <div className="card" style={{ fontSize: '0.8rem' }}>
-                <p style={{ fontWeight: 600, marginBottom: '4px' }}>🤖 Prompt Architecture Engine v2.1</p>
-                <p style={{ marginBottom: 0, color: 'var(--fg3)' }}>describe your domain/task and I'll generate a production-ready prompt blueprint. one sentence is enough.</p>
+                <p style={{ fontWeight: 600, marginBottom: '4px' }}>Prompt Architecture Engine v2.1</p>
+                <p style={{ marginBottom: 0, color: 'var(--fg3)' }}>describe your domain or task. one sentence is enough.</p>
               </div>
             )}
             {messages.map((m, i) => (
@@ -111,6 +143,32 @@ export default function GodPromptPage() {
             <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMeta() } }} placeholder="describe your task..." rows={2} style={{ flex: 1, resize: 'none' }} />
             <button className="btn btn-p" onClick={sendMeta} disabled={loading || !input.trim()}>send</button>
           </div>
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {builderHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--fg3)' }}>
+              <p>no sessions yet, go build something</p>
+              <button className="btn btn-s btn-sm" onClick={() => setTab('builder')}>open builder →</button>
+            </div>
+          ) : (
+            <>
+              {builderHistory.map(s => (
+                <div key={s.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => loadSession(s)}>
+                    <p style={{ fontWeight: 500, marginBottom: '2px', fontSize: '0.875rem', color: 'var(--fg)' }}>{s.preview}</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginBottom: 0 }}>
+                      {s.messages.length} msgs · {new Date(s.ts).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button onClick={() => deleteSession(s.id)} className="icon-btn" style={{ color: 'var(--danger)', flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+              <button onClick={clearAll} className="btn btn-d" style={{ marginTop: '8px' }}>delete all sessions</button>
+            </>
+          )}
         </div>
       )}
 
