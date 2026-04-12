@@ -2,8 +2,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { storage } from '@/lib/storage'
+import { useConfirm } from '@/components/ConfirmModal'
 
 function HistoryContent() {
+  const { confirm, Modal } = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [tab, setTab] = useState(searchParams.get('tab') || 'chat')
