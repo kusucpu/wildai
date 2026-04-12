@@ -6,29 +6,42 @@ import { storage } from '@/lib/storage'
 import { CHAT_MODES } from '@/lib/prompts'
 import BYOPModal from '@/components/BYOPModal'
 import { useConfirm } from '@/components/ConfirmModal'
+import CustomSelect from '@/components/CustomSelect'
+
+const CHAT_LOAD_MSGS = [
+  'thinking real hard rn...',
+  'consulting the AI overlords...',
+  'generating something probably good...',
+  'please hold, genius in progress...',
+  'asking the robots politely...',
+  'processing your chaos...',
+  'this might be mid but idk...',
+  'summoning words from the void...',
+]
 
 function ChatContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initMode = searchParams.get('mode') || 'regular'
 
-  const [mode, setMode] = useState(initMode)
-  const [model, setModel] = useState('nova-fast') // default nova micro
+  const [mode, setMode]         = useState(initMode)
+  const [model, setModel]       = useState('nova-fast')
   const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [loadMsg, setLoadMsg]   = useState('')
   const [showBYOP, setShowBYOP] = useState(false)
   const [imagePrompt, setImagePrompt] = useState(null)
-  const [savedTs, setSavedTs] = useState(null)
-  const [imgFile, setImgFile] = useState(null)
+  const [savedTs, setSavedTs]   = useState(null)
+  const [imgFile, setImgFile]   = useState(null)
 
   const bottomRef = useRef(null)
-  const taRef = useRef(null)
-  const fileRef = useRef(null)
+  const taRef     = useRef(null)
+  const fileRef   = useRef(null)
   const currentMode = CHAT_MODES.find(m => m.id === mode) || CHAT_MODES[0]
   const { confirm, Modal } = useConfirm()
 
-  // Load from history
+  // Fix: use window.location so useEffect fires fresh on every navigation
   useEffect(() => {
     const stored = sessionStorage.getItem('load_chat')
     if (stored) {
@@ -61,6 +74,7 @@ function ChatContent() {
     setInput('')
     setImgFile(null)
     setLoading(true)
+    setLoadMsg(CHAT_LOAD_MSGS[Math.floor(Math.random() * CHAT_LOAD_MSGS.length)])
 
     try {
       const content = await chat(newMessages, model, currentMode.system)
@@ -92,6 +106,8 @@ function ChatContent() {
     })
   }
 
+  const modelOptions = FREE_CHAT_MODELS.map(m => ({ value: m.id, label: m.name, note: m.note }))
+
   return (
     <>
       <Modal />
@@ -106,12 +122,16 @@ function ChatContent() {
             ))}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--fg3)' }}>model:</span>
-            <select value={model} onChange={e => setModel(e.target.value)} style={{ width: 'auto', padding: '3px 8px', fontSize: '0.75rem' }}>
-              {FREE_CHAT_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            {getByopKey() && <span style={{ fontSize: '0.7rem', color: 'var(--ok)' }}>BYOP</span>}
-            {savedTs && <a href="/history" style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginLeft: 'auto' }}>saved to history</a>}
+            <span style={{ fontSize: '0.75rem', color: 'var(--fg3)', flexShrink: 0 }}>model:</span>
+            <div style={{ flex: 1, maxWidth: '200px' }}>
+              <CustomSelect
+                value={model}
+                onChange={setModel}
+                options={modelOptions}
+              />
+            </div>
+            {getByopKey() && <span style={{ fontSize: '0.7rem', color: 'var(--ok)', flexShrink: 0 }}>BYOP</span>}
+            {savedTs && <a href="/history" style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginLeft: 'auto', flexShrink: 0 }}>saved →</a>}
           </div>
           {currentMode.disclaimer && <p style={{ fontSize: '0.7rem', color: 'var(--fg3)', margin: 0 }}>{currentMode.disclaimer}</p>}
         </div>
@@ -135,7 +155,9 @@ function ChatContent() {
           {loading && (
             <div className="msg ai">
               <div className="msg-bubble">
+                <div className="msg-label">{currentMode.label}</div>
                 <div className="dots"><div className="dot" /><div className="dot" /><div className="dot" /></div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--fg3)', marginTop: '4px' }}>{loadMsg}</div>
               </div>
             </div>
           )}
@@ -146,26 +168,19 @@ function ChatContent() {
         <div className="chat-input-bar">
           {imgFile && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--fg3)' }}>
-              <span>attached: {imgFile.name}</span>
+              <span>📎 {imgFile.name}</span>
               <button onClick={() => setImgFile(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 0 }}>✕</button>
             </div>
           )}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
-            {/* image upload button */}
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="icon-btn"
-              title="attach image"
-              style={{ flexShrink: 0, marginBottom: '2px' }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <button onClick={() => fileRef.current?.click()} className="icon-btn" title="attach image" style={{ flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth={1.75} />
                 <circle cx="8.5" cy="8.5" r="1.5" strokeWidth={1.75} />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 15l-5-5L5 21" />
               </svg>
             </button>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => setImgFile(e.target.files?.[0] || null)} />
-
             <textarea
               ref={taRef}
               value={input}
@@ -176,17 +191,14 @@ function ChatContent() {
               style={{ resize: 'none', flex: 1, maxHeight: '120px', overflowY: 'auto' }}
             />
             <button onClick={send} disabled={!input.trim() || loading} className="btn btn-p" style={{ padding: '8px 14px', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
               </svg>
             </button>
           </div>
           {messages.length > 0 && (
             <button
-              onClick={async () => {
-                const ok = await confirm('clear this chat? (already saved to history tho)')
-                if (ok) setMessages([])
-              }}
+              onClick={async () => { const ok = await confirm('clear this chat? (already saved to history tho)'); if (ok) setMessages([]) }}
               style={{ fontSize: '0.7rem', color: 'var(--fg3)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
             >
               clear chat
@@ -200,13 +212,14 @@ function ChatContent() {
         <div className="modal-overlay" onClick={() => setImagePrompt(null)}>
           <div className="modal-box" style={{ padding: '20px' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom: '8px' }}>generate this scene?</h3>
-            <p style={{ fontSize: '0.8rem', marginBottom: '12px' }}>{imagePrompt}</p>
+            <p style={{ fontSize: '0.8rem', marginBottom: '12px', color: 'var(--fg2)' }}>{imagePrompt}</p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-p" style={{ flex: 1 }} onClick={() => {
                 sessionStorage.setItem('prefill_prompt', imagePrompt)
                 setImagePrompt(null)
-                router.push('/image')
-              }}>go to image page</button>
+                // window.location forces remount so useEffect fires
+                window.location.href = '/image'
+              }}>go generate →</button>
               <button className="btn btn-s" onClick={() => setImagePrompt(null)}>cancel</button>
             </div>
           </div>
